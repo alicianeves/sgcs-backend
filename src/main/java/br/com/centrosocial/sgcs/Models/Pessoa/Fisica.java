@@ -1,94 +1,82 @@
 package br.com.centrosocial.sgcs.Models.Pessoa;
 
-import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
+import br.com.centrosocial.sgcs.Models.Familia.Familia;
+import jakarta.persistence.*;
 
-import java.time.LocalDateTime;
 import java.time.LocalDate;
+import java.time.Period;
 
 @Entity
-public class Fisica extends Pessoa{
+public class Fisica extends Pessoa {
     private String nome;
-    @jakarta.persistence.Column(unique = true, nullable = false)
+    @Column(unique = true, nullable = false)
     private String cpf;
     private LocalDate dataNascimento;
+    private Integer idadeInformada;
     private String email;
-    @jakarta.persistence.Column(unique = true, nullable = false)
+    private String nomeMae;
+    @Enumerated(EnumType.STRING)
+    private Sexo sexo;
+    @Enumerated(EnumType.STRING)
+    private EstadoCivil estadoCivil;
+    private String rg;
+    private String nis;
+    @Enumerated(EnumType.STRING)
+    private Escolaridade escolaridade;
+    private String ocupacao;
+    private String contato2;
+    @Column(unique = true)
     private String usuario;
     private String senha;
     @Enumerated(EnumType.STRING)
     private Perfil perfil;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "familia_id")
+    private Familia familia;
+    @Enumerated(EnumType.STRING)
+    private VinculoFamiliar vinculoFamiliar;
 
-    public Fisica(Long id, String telefone, String cep, String logradouro, String numero, String bairro, String cidade, String estado, boolean status, LocalDateTime dataCriacao, LocalDateTime dataInativacao, String nome, String cpf, LocalDate dataNascimento, String email, String usuario, String senha, Perfil perfil) {
-        super(id, telefone, cep, logradouro, numero, bairro, cidade, estado, status, dataCriacao, dataInativacao);
-        this.nome = nome;
-        this.cpf = cpf;
-        this.dataNascimento = dataNascimento;
-        this.email = email;
-        this.usuario = usuario;
-        this.senha = senha;
-        this.perfil = perfil;
-    }
+    public Fisica() { super(); }
 
-    public Fisica(){
-        super();
+    public String getNome() { return nome; }
+    public void setNome(String nome) { this.nome = nome; }
+    public String getCpf() { return cpf; }
+    public void setCpf(String cpf) { this.cpf = cpf; }
+    public LocalDate getDataNascimento() { return dataNascimento; }
+    public void setDataNascimento(LocalDate dataNascimento) { this.dataNascimento = dataNascimento; }
+    public Integer getIdadeInformada() { return idadeInformada; }
+    public void setIdadeInformada(Integer idadeInformada) { this.idadeInformada = idadeInformada; }
+    @Transient
+    public Integer getIdadeEfetiva() {
+        if (dataNascimento == null) return idadeInformada;
+        return Period.between(dataNascimento, LocalDate.now()).getYears();
     }
-
-    //getters and setters
-    public String getNome() {
-        return nome;
-    }
-
-    public void setNome(String nome) {
-        this.nome = nome;
-    }
-
-    public String getCpf() {
-        return cpf;
-    }
-
-    public void setCpf(String cpf) {
-        this.cpf = cpf;
-    }
-
-    public LocalDate getDataNascimento() {
-        return dataNascimento;
-    }
-
-    public void setDataNascimento(LocalDate dataNascimento) {
-        this.dataNascimento = dataNascimento;
-    }
-
-    public String getEmail() {
-        return email;
-    }
-
-    public void setEmail(String email) {
-        this.email = email;
-    }
-
-    public String getUsuario() {
-        return usuario;
-    }
-
-    public void setUsuario(String usuario) {
-        this.usuario = usuario;
-    }
-
-    public String getSenha() {
-        return senha;
-    }
-
-    public void setSenha(String senha) {
-        this.senha = senha;
-    }
-
-    public Perfil getPerfil() {
-        return perfil;
-    }
-
-    public void setPerfil(Perfil perfil) {
-        this.perfil = perfil;
-    }
+    public String getEmail() { return email; }
+    public void setEmail(String email) { this.email = email; }
+    public String getNomeMae() { return nomeMae; }
+    public void setNomeMae(String nomeMae) { this.nomeMae = nomeMae; }
+    public Sexo getSexo() { return sexo; }
+    public void setSexo(Sexo sexo) { this.sexo = sexo; }
+    public EstadoCivil getEstadoCivil() { return estadoCivil; }
+    public void setEstadoCivil(EstadoCivil estadoCivil) { this.estadoCivil = estadoCivil; }
+    public String getRg() { return rg; }
+    public void setRg(String rg) { this.rg = rg; }
+    public String getNis() { return nis; }
+    public void setNis(String nis) { this.nis = nis; }
+    public Escolaridade getEscolaridade() { return escolaridade; }
+    public void setEscolaridade(Escolaridade escolaridade) { this.escolaridade = escolaridade; }
+    public String getOcupacao() { return ocupacao; }
+    public void setOcupacao(String ocupacao) { this.ocupacao = ocupacao; }
+    public String getContato2() { return contato2; }
+    public void setContato2(String contato2) { this.contato2 = contato2; }
+    public String getUsuario() { return usuario; }
+    public void setUsuario(String usuario) { this.usuario = usuario; }
+    public String getSenha() { return senha; }
+    public void setSenha(String senha) { this.senha = senha; }
+    public Perfil getPerfil() { return perfil; }
+    public void setPerfil(Perfil perfil) { this.perfil = perfil; }
+    public Familia getFamilia() { return familia; }
+    public void setFamilia(Familia familia) { this.familia = familia; }
+    public VinculoFamiliar getVinculoFamiliar() { return vinculoFamiliar; }
+    public void setVinculoFamiliar(VinculoFamiliar vinculoFamiliar) { this.vinculoFamiliar = vinculoFamiliar; }
 }
