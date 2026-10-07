@@ -31,6 +31,10 @@ public class Familia {
     private String relatos;
     @Enumerated(EnumType.STRING)
     private AvaliacaoFamilia avaliacao;
+    @Enumerated(EnumType.STRING)
+    private TipoResidencia residencia;
+    @Column(precision = 12, scale = 2)
+    private BigDecimal valorAluguel;
     private boolean status;
     private LocalDateTime dataInativacao;
 
@@ -69,6 +73,10 @@ public class Familia {
     public void setRelatos(String relatos) { this.relatos = relatos; }
     public AvaliacaoFamilia getAvaliacao() { return avaliacao; }
     public void setAvaliacao(AvaliacaoFamilia avaliacao) { this.avaliacao = avaliacao; }
+    public TipoResidencia getResidencia() { return residencia; }
+    public void setResidencia(TipoResidencia residencia) { this.residencia = residencia; }
+    public BigDecimal getValorAluguel() { return valorAluguel; }
+    public void setValorAluguel(BigDecimal valorAluguel) { this.valorAluguel = valorAluguel; }
     public boolean isStatus() { return status; }
     public void setStatus(boolean status) { this.status = status; }
     public LocalDateTime getDataInativacao() { return dataInativacao; }

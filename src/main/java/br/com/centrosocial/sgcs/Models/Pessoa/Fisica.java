@@ -5,6 +5,8 @@ import jakarta.persistence.*;
 
 import java.time.LocalDate;
 import java.time.Period;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 public class Fisica extends Pessoa {
@@ -30,11 +32,17 @@ public class Fisica extends Pessoa {
     private String senha;
     @Enumerated(EnumType.STRING)
     private Perfil perfil;
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private TipoCadastro tipoCadastro = TipoCadastro.PESSOA;
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "familia_id")
     private Familia familia;
     @Enumerated(EnumType.STRING)
     private VinculoFamiliar vinculoFamiliar;
+    @OneToMany(mappedBy = "idoso", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OrderBy("id")
+    private List<ContatoFamiliar> contatosFamiliares = new ArrayList<>();
 
     public Fisica() { super(); }
 
@@ -75,8 +83,18 @@ public class Fisica extends Pessoa {
     public void setSenha(String senha) { this.senha = senha; }
     public Perfil getPerfil() { return perfil; }
     public void setPerfil(Perfil perfil) { this.perfil = perfil; }
+    public TipoCadastro getTipoCadastro() { return tipoCadastro; }
+    public void setTipoCadastro(TipoCadastro tipoCadastro) { this.tipoCadastro = tipoCadastro; }
     public Familia getFamilia() { return familia; }
     public void setFamilia(Familia familia) { this.familia = familia; }
     public VinculoFamiliar getVinculoFamiliar() { return vinculoFamiliar; }
     public void setVinculoFamiliar(VinculoFamiliar vinculoFamiliar) { this.vinculoFamiliar = vinculoFamiliar; }
+    public List<ContatoFamiliar> getContatosFamiliares() { return contatosFamiliares; }
+    public void substituirContatosFamiliares(List<ContatoFamiliar> contatos) {
+        contatosFamiliares.clear();
+        contatos.forEach(contato -> {
+            contato.setIdoso(this);
+            contatosFamiliares.add(contato);
+        });
+    }
 }

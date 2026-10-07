@@ -15,6 +15,8 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.PatchMapping;
 
 import java.util.List;
 
@@ -28,8 +30,11 @@ public class PessoaController {
     }
 
     @GetMapping
-    public List<PessoaResponse> listar() {
-        return pessoaService.listar();
+    public List<PessoaResponse> listar(
+            @RequestParam(required = false) String busca,
+            @RequestParam(defaultValue = "true") boolean status
+    ) {
+        return pessoaService.listar(busca, status);
     }
 
     @GetMapping("/{id}")
@@ -47,6 +52,12 @@ public class PessoaController {
         return pessoaService.atualizarFisica(id, request);
     }
 
+    @DeleteMapping("/fisicas/{id}/acesso")
+    public ResponseEntity<Void> removerAcesso(@PathVariable Long id) {
+        pessoaService.removerAcesso(id);
+        return ResponseEntity.noContent().build();
+    }
+
     @PostMapping("/juridicas")
     public ResponseEntity<PessoaResponse> cadastrarJuridica(@Valid @RequestBody JuridicaRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(pessoaService.cadastrarJuridica(request));
@@ -60,6 +71,12 @@ public class PessoaController {
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> inativar(@PathVariable Long id) {
         pessoaService.inativar(id);
+        return ResponseEntity.noContent().build();
+    }
+
+    @PatchMapping("/{id}/reativar")
+    public ResponseEntity<Void> reativar(@PathVariable Long id) {
+        pessoaService.reativar(id);
         return ResponseEntity.noContent().build();
     }
 }

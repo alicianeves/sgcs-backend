@@ -64,7 +64,7 @@ curl -i -X POST http://localhost:8080/api/auth/setup \
     "cidade": "Sao Paulo",
     "estado": "SP",
     "nome": "Administrador de Teste",
-    "cpf": "12345678901",
+    "cpf": "52998224725",
     "dataNascimento": "1990-01-01",
     "email": "admin@teste.local",
     "usuario": "admin",
@@ -96,6 +96,64 @@ curl http://localhost:8080/api/pessoas \
 ```
 
 A resposta esperada é uma lista com o administrador cadastrado.
+
+O CRUD de Pessoas também permite busca, consulta de inativos, reativação e remoção explícita de acesso:
+
+```text
+GET    /api/pessoas?busca=&status=true
+GET    /api/pessoas/{id}
+POST   /api/pessoas/fisicas
+PUT    /api/pessoas/fisicas/{id}
+DELETE /api/pessoas/fisicas/{id}/acesso
+POST   /api/pessoas/juridicas
+PUT    /api/pessoas/juridicas/{id}
+DELETE /api/pessoas/{id}
+PATCH  /api/pessoas/{id}/reativar
+```
+
+`busca` pesquisa nome/CPF ou razão social/CNPJ. Somente `ADMINISTRADOR` pode conceder,
+alterar ou remover credenciais e perfil. `ATENDIMENTO_GESTAO` e `COLABORADOR` podem
+editar os demais dados pessoais; `PROFESSOR_INSTRUTOR` não acessa o CRUD administrativo.
+
+Para Pessoa Física, envie `dataNascimento` quando conhecida. Caso ela seja desconhecida,
+envie `dataNascimento: null` e `idadeInformada` com um inteiro maior ou igual a zero. O response
+continua expondo somente `idade`: calculada pela data ou preenchida pela idade informada.
+
+## Famílias e atendimento de idosas
+
+Os endpoints de Família e de atendimentos exigem JWT e perfil `ADMINISTRADOR` ou
+`ATENDIMENTO_GESTAO`.
+
+```text
+GET    /api/familias?busca=&status=
+GET    /api/familias/{id}
+POST   /api/familias
+PUT    /api/familias/{id}
+PATCH  /api/familias/{id}/inativar
+PATCH  /api/familias/{id}/reativar
+```
+
+O parâmetro `busca` pesquisa parcialmente o nome da família. `status` aceita
+`true` ou `false`. A composição recebe IDs de Pessoas Físicas já cadastradas.
+
+O cadastro contextual da idosa utiliza uma Pessoa Física e registros de Atendimento:
+
+```text
+GET    /api/atendimentos?fisicaId={id}
+GET    /api/atendimentos/{id}
+POST   /api/atendimentos
+PUT    /api/atendimentos/{id}
+PATCH  /api/atendimentos/{id}/inativar
+PATCH  /api/atendimentos/{id}/reativar
+```
+
+Em bancos criados antes de Pessoas Físicas sem acesso serem suportadas, a coluna `fisica.usuario`
+pode continuar com `NOT NULL`, pois o `ddl-auto=update` não remove essa restrição automaticamente.
+Nesse caso, execute uma única vez:
+
+```sql
+ALTER TABLE fisica MODIFY COLUMN usuario VARCHAR(255) NULL;
+```
 
 ## Conferir o banco diretamente
 
@@ -143,3 +201,22 @@ docker compose up --build -d
 ```
 
 O parâmetro `-v` remove o volume do MySQL e apaga definitivamente os dados locais.
+
+## Testar com Postman
+
+Importe o arquivo `postman/SGCS.postman_collection.json` no Postman. A collection usa
+`http://localhost:8080` como `baseUrl`, realiza o login e armazena o JWT automaticamente.
+
+Para executar o fluxo completo, abra o **Collection Runner** e mantenha a ordem das pastas:
+
+1. Configuração inicial e autenticação
+2. Pessoas físicas
+3. Pessoas jurídicas
+4. Consultas e autorização
+5. Famílias
+6. Atendimento da idosa
+7. Inativação
+
+O primeiro setup aceita `201 Created` em banco vazio ou `409 Conflict` quando o administrador
+`admin` já existe. Para repetir todos os casos positivos, o banco deve possuir esse administrador
+com a senha `admin123`. A collection não apaga nem reinicia o banco automaticamente.

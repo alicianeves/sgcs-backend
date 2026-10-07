@@ -100,6 +100,16 @@ public class FamiliaService {
         }
         familia.setRelatos(normalizar(r.relatos()));
         familia.setAvaliacao(r.avaliacao());
+        if (r.residencia() == null)
+            throw new BusinessException("A residência da família é obrigatória.");
+        if (r.valorAluguel() != null && r.valorAluguel().signum() < 0)
+            throw new BusinessException("O valor do aluguel não pode ser negativo.");
+        if (r.residencia() == TipoResidencia.ALUGADA && r.valorAluguel() == null)
+            throw new BusinessException("Informe o valor do aluguel para residência alugada.");
+        if (r.residencia() != TipoResidencia.ALUGADA && r.valorAluguel() != null)
+            throw new BusinessException("O valor do aluguel somente se aplica à residência alugada.");
+        familia.setResidencia(r.residencia());
+        familia.setValorAluguel(r.valorAluguel());
     }
 
     private void atualizarComposicao(Familia familia, List<MembroFamiliaRequest> pedidos) {
@@ -172,7 +182,7 @@ public class FamiliaService {
         List<MembroFamiliaResponse> membros = composicao.stream().map(this::toMembro).toList();
         return new FamiliaResponse(f.getId(), f.getNome(), composicao.size(), rendas(f), membros,
                 f.getRelatos(), f.getAvaliacao(),
-                f.isStatus(), f.getDataInativacao());
+                f.isStatus(), f.getDataInativacao(), f.getResidencia(), f.getValorAluguel());
     }
 
     private MembroFamiliaResponse toMembro(Fisica p) {

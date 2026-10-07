@@ -8,6 +8,7 @@ import br.com.centrosocial.sgcs.DTO.Pessoa.PessoaResponse;
 import br.com.centrosocial.sgcs.Exception.ConflictException;
 import br.com.centrosocial.sgcs.Models.Pessoa.Fisica;
 import br.com.centrosocial.sgcs.Models.Pessoa.Perfil;
+import br.com.centrosocial.sgcs.Models.Pessoa.TipoCadastro;
 import br.com.centrosocial.sgcs.Repository.FisicaRepository;
 import br.com.centrosocial.sgcs.Security.JwtService;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -35,17 +36,20 @@ public class AuthService {
     }
 
     public synchronized PessoaResponse configurarAdministradorInicial(SetupRequest request) {
-        if (fisicaRepository.count() > 0) {
+        if (fisicaRepository.existsByUsuarioIsNotNull()) {
             throw new ConflictException("Configuração inicial já realizada.");
         }
 
         FisicaRequest administrador = new FisicaRequest(
                 request.telefone(), request.cep(), request.logradouro(), request.numero(), request.bairro(),
                 request.cidade(), request.estado(), request.nome(), request.cpf(), request.dataNascimento(),
-                request.email(), request.usuario(), request.senha(), Perfil.ADMINISTRADOR
+                request.idadeInformada(),
+                request.email(), null, null, null, null, null, null, null, null,
+                TipoCadastro.PESSOA, null, null, null,
+                request.usuario(), request.senha(), Perfil.ADMINISTRADOR
         );
 
-        return pessoaService.cadastrarFisica(administrador);
+        return pessoaService.cadastrarAdministradorInicial(administrador);
     }
 
     public LoginResponse login(LoginRequest request) {

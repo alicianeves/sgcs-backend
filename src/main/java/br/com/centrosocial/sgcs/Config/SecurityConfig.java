@@ -1,12 +1,12 @@
 package br.com.centrosocial.sgcs.Config;
 
 import br.com.centrosocial.sgcs.Repository.FisicaRepository;
+import br.com.centrosocial.sgcs.Models.Pessoa.TipoCadastro;
 import com.nimbusds.jose.jwk.source.ImmutableSecret;
 import com.nimbusds.jose.proc.SecurityContext;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -19,8 +19,14 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.JwtEncoder;
+import org.springframework.security.oauth2.jwt.JwtValidators;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
+import org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator;
+import org.springframework.security.oauth2.core.OAuth2Error;
+import org.springframework.security.oauth2.core.OAuth2TokenValidator;
+import org.springframework.security.oauth2.core.OAuth2TokenValidatorResult;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
 import org.springframework.security.web.SecurityFilterChain;
@@ -46,8 +52,11 @@ public class SecurityConfig {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(authorize -> authorize
                         .requestMatchers("/api/auth/login", "/api/auth/setup", "/error").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/pessoas/**").authenticated()
                         .requestMatchers("/api/pessoas/**")
+                        .hasAnyRole("ADMINISTRADOR", "ATENDIMENTO_GESTAO", "COLABORADOR")
+                        .requestMatchers("/api/cadastros/contextuais/**")
+                        .hasAnyRole("ADMINISTRADOR", "ATENDIMENTO_GESTAO", "COLABORADOR")
+                        .requestMatchers("/api/familias/**", "/api/atendimentos/**")
                         .hasAnyRole("ADMINISTRADOR", "ATENDIMENTO_GESTAO")
                         .anyRequest().authenticated()
                 )
@@ -63,7 +72,7 @@ public class SecurityConfig {
     ) {
         CorsConfiguration configuration = new CorsConfiguration();
         configuration.setAllowedOrigins(allowedOrigins);
-        configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+        configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("Authorization", "Content-Type"));
         configuration.setMaxAge(3600L);
 
@@ -80,6 +89,7 @@ public class SecurityConfig {
     @Bean
     UserDetailsService userDetailsService(FisicaRepository fisicaRepository) {
         return usuario -> fisicaRepository.findByUsuarioAndStatusTrue(usuario)
+                .filter(fisica -> fisica.getTipoCadastro() == TipoCadastro.PESSOA)
                 .map(fisica -> User.withUsername(fisica.getUsuario())
                         .password(fisica.getSenha())
                         .authorities("ROLE_" + fisica.getPerfil().name())
@@ -106,10 +116,26 @@ public class SecurityConfig {
     }
 
     @Bean
-    JwtDecoder jwtDecoder(SecretKey secretKey) {
-        return NimbusJwtDecoder.withSecretKey(secretKey)
+    JwtDecoder jwtDecoder(SecretKey secretKey, FisicaRepository fisicaRepository) {
+        NimbusJwtDecoder decoder = NimbusJwtDecoder.withSecretKey(secretKey)
                 .macAlgorithm(MacAlgorithm.HS256)
                 .build();
+        OAuth2TokenValidator<Jwt> usuarioAtivo = jwt -> {
+            Number pessoaId = jwt.getClaim("pessoaId");
+            List<String> perfisToken = jwt.getClaimAsStringList("roles");
+            boolean valido = pessoaId != null && fisicaRepository.findById(pessoaId.longValue())
+                    .filter(f -> f.isStatus() && f.getUsuario() != null && f.getPerfil() != null)
+                    .filter(f -> f.getTipoCadastro() == TipoCadastro.PESSOA)
+                    .filter(f -> f.getUsuario().equals(jwt.getSubject()))
+                    .filter(f -> perfisToken != null && perfisToken.contains("ROLE_" + f.getPerfil().name()))
+                    .isPresent();
+            return valido ? OAuth2TokenValidatorResult.success()
+                    : OAuth2TokenValidatorResult.failure(
+                            new OAuth2Error("invalid_token", "Usuário inativo ou acesso alterado.", null));
+        };
+        decoder.setJwtValidator(new DelegatingOAuth2TokenValidator<>(
+                JwtValidators.createDefault(), usuarioAtivo));
+        return decoder;
     }
 
     private JwtAuthenticationConverter jwtAuthenticationConverter() {

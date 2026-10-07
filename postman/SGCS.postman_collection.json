@@ -1,0 +1,445 @@
+{
+  "info": {
+    "_postman_id": "b90bdb62-8a22-4da3-90d8-1770aebedc1d",
+    "name": "SGCS API",
+    "description": "Testes da API SGCS atual. Execute as pastas na ordem apresentada.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8080" },
+    { "key": "token", "value": "" },
+    { "key": "adminUsuario", "value": "admin" },
+    { "key": "adminSenha", "value": "admin123" },
+    { "key": "fisicaId", "value": "" },
+    { "key": "fisicaTesteId", "value": "" },
+    { "key": "juridicaId", "value": "" },
+    { "key": "membroId", "value": "" },
+    { "key": "familiaId", "value": "" },
+    { "key": "atendimentoId", "value": "" },
+    { "key": "usuarioTeste", "value": "" },
+    { "key": "senhaTeste", "value": "teste1234" },
+    { "key": "cpfTeste", "value": "" },
+    { "key": "emailTeste", "value": "" },
+    { "key": "cnpjTeste", "value": "" },
+    { "key": "colaboradorToken", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "01 - Configuração inicial e autenticação",
+      "item": [
+        {
+          "name": "Criar primeiro administrador",
+          "description": "Em uma base já configurada, 409 é aceito para permitir nova execução.",
+          "auth": { "type": "noauth" },
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"telefone\":\"11999999999\",\"cep\":\"01001000\",\"logradouro\":\"Praça da Sé\",\"numero\":\"100\",\"bairro\":\"Sé\",\"cidade\":\"São Paulo\",\"estado\":\"SP\",\"nome\":\"Administrador de Teste\",\"cpf\":\"52998224725\",\"dataNascimento\":\"1990-01-01\",\"email\":\"admin@teste.local\",\"usuario\":\"{{adminUsuario}}\",\"senha\":\"{{adminSenha}}\"}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{baseUrl}}/api/auth/setup"
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('Setup retorna 201 ou 409', () => pm.expect([201, 409]).to.include(pm.response.code));",
+            "if (pm.response.code === 201) {",
+            "  const body = pm.response.json();",
+            "  pm.collectionVariables.set('fisicaId', body.id);",
+            "  pm.test('Administrador criado corretamente', function () { pm.expect(body.tipo).to.eql('FISICA'); pm.expect(body.status).to.eql(true); pm.expect(body.usuario).to.eql(pm.collectionVariables.get('adminUsuario')); pm.expect(body.perfil).to.eql('ADMINISTRADOR'); });",
+            "}"
+          ] } }]
+        },
+        {
+          "name": "Rejeitar setup duplicado",
+          "auth": { "type": "noauth" },
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"telefone\":\"11999999999\",\"cep\":\"01001000\",\"logradouro\":\"Praça da Sé\",\"numero\":\"101\",\"bairro\":\"Sé\",\"cidade\":\"São Paulo\",\"estado\":\"SP\",\"nome\":\"Administrador Duplicado\",\"cpf\":\"11144477735\",\"dataNascimento\":\"1990-01-01\",\"email\":\"admin2@teste.local\",\"usuario\":\"admin2\",\"senha\":\"admin123\"}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{baseUrl}}/api/auth/setup"
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('Setup duplicado retorna 409', () => pm.response.to.have.status(409));",
+            "const body = pm.response.json(); pm.test('Erro segue o contrato padrão', function () { pm.expect(body.status).to.eql(409); pm.expect(body).to.have.property('message'); pm.expect(body).to.have.property('timestamp'); });"
+          ] } }]
+        },
+        {
+          "name": "Login do administrador",
+          "auth": { "type": "noauth" },
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\"usuario\":\"{{adminUsuario}}\",\"senha\":\"{{adminSenha}}\"}", "options": { "raw": { "language": "json" } } },
+            "url": "{{baseUrl}}/api/auth/login"
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('Login retorna 200', () => pm.response.to.have.status(200));",
+            "const body = pm.response.json();",
+            "pm.test('Resposta contém JWT', function () { pm.expect(body.token).to.be.a('string').and.not.empty; pm.expect(body.token.split('.')).to.have.length(3); });",
+            "pm.collectionVariables.set('token', body.token);",
+            "let part = body.token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'); part += '='.repeat((4 - part.length % 4) % 4); const payload = JSON.parse(atob(part)); if (!pm.collectionVariables.get('fisicaId')) pm.collectionVariables.set('fisicaId', payload.pessoaId);"
+          ] } }]
+        },
+        {
+          "name": "Rejeitar login inválido",
+          "auth": { "type": "noauth" },
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\"usuario\":\"{{adminUsuario}}\",\"senha\":\"senha-incorreta\"}", "options": { "raw": { "language": "json" } } },
+            "url": "{{baseUrl}}/api/auth/login"
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('Credenciais inválidas retornam 401', () => pm.response.to.have.status(401));",
+            "pm.test('Resposta informa erro de autenticação', () => pm.expect(pm.response.json().status).to.eql(401));"
+          ] } }]
+        },
+        {
+          "name": "Rejeitar consulta sem token",
+          "auth": { "type": "noauth" },
+          "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/api/pessoas" },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Sem token retorna 401', () => pm.response.to.have.status(401));"] } }]
+        }
+      ]
+    },
+    {
+      "name": "02 - Pessoas físicas",
+      "item": [
+        {
+          "name": "Cadastrar colaborador",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"telefone\":\"11988887777\",\"cep\":\"01310100\",\"logradouro\":\"Avenida Paulista\",\"numero\":\"1000\",\"bairro\":\"Bela Vista\",\"cidade\":\"São Paulo\",\"estado\":\"SP\",\"nome\":\"Colaborador Postman\",\"cpf\":\"{{cpfTeste}}\",\"dataNascimento\":\"1995-05-20\",\"email\":\"{{emailTeste}}\",\"usuario\":\"{{usuarioTeste}}\",\"senha\":\"{{senhaTeste}}\",\"perfil\":\"COLABORADOR\"}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{baseUrl}}/api/pessoas/fisicas"
+          },
+          "event": [
+            { "listen": "prerequest", "script": { "type": "text/javascript", "exec": [
+              "const suffix = Date.now().toString().slice(-10);",
+              "pm.collectionVariables.set('usuarioTeste', `colab_${suffix}`);",
+              "pm.collectionVariables.set('cpfTeste', '39053344705');",
+              "pm.collectionVariables.set('emailTeste', `colab_${suffix}@teste.local`);"
+            ] } },
+            { "listen": "test", "script": { "type": "text/javascript", "exec": [
+              "pm.test('Pessoa física criada com 201', () => pm.response.to.have.status(201));",
+              "const body = pm.response.json(); pm.collectionVariables.set('fisicaTesteId', body.id);",
+              "pm.test('Resposta não expõe senha', function () { pm.expect(body.tipo).to.eql('FISICA'); pm.expect(body.status).to.eql(true); pm.expect(body.perfil).to.eql('COLABORADOR'); pm.expect(body).not.to.have.property('senha'); });"
+            ] } }
+          ]
+        },
+        {
+          "name": "Rejeitar CPF duplicado",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"telefone\":\"11988887777\",\"cep\":\"01310100\",\"logradouro\":\"Avenida Paulista\",\"numero\":\"1001\",\"bairro\":\"Bela Vista\",\"cidade\":\"São Paulo\",\"estado\":\"SP\",\"nome\":\"CPF Duplicado\",\"cpf\":\"{{cpfTeste}}\",\"dataNascimento\":\"1991-01-01\",\"email\":\"duplicado@teste.local\",\"usuario\":\"outro_{{usuarioTeste}}\",\"senha\":\"{{senhaTeste}}\",\"perfil\":\"COLABORADOR\"}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{baseUrl}}/api/pessoas/fisicas"
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('CPF duplicado retorna 409', () => pm.response.to.have.status(409));"] } }]
+        },
+        {
+          "name": "Rejeitar pessoa física inválida",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"telefone\":\"\",\"cep\":\"01001000\",\"logradouro\":\"Rua Teste\",\"numero\":\"1\",\"bairro\":\"Centro\",\"cidade\":\"São Paulo\",\"estado\":\"SP\",\"nome\":\"Registro Inválido\",\"cpf\":\"00000000000\",\"dataNascimento\":\"1990-01-01\",\"email\":\"email@teste.local\",\"usuario\":\"invalido\",\"senha\":\"12345678\",\"perfil\":\"COLABORADOR\"}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{baseUrl}}/api/pessoas/fisicas"
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('Campo obrigatório inválido retorna 400', () => pm.response.to.have.status(400));",
+            "pm.test('Mensagem identifica telefone', () => pm.expect(pm.response.json().message).to.include('telefone'));"
+          ] } }]
+        },
+        {
+          "name": "Atualizar colaborador sem trocar senha",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"telefone\":\"11977776666\",\"cep\":\"01310100\",\"logradouro\":\"Avenida Paulista\",\"numero\":\"1100\",\"bairro\":\"Bela Vista\",\"cidade\":\"São Paulo\",\"estado\":\"SP\",\"nome\":\"Colaborador Atualizado\",\"cpf\":\"{{cpfTeste}}\",\"dataNascimento\":\"1995-05-20\",\"email\":\"{{emailTeste}}\",\"usuario\":\"{{usuarioTeste}}\",\"senha\":null,\"perfil\":\"COLABORADOR\"}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{baseUrl}}/api/pessoas/fisicas/{{fisicaTesteId}}"
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('Atualização retorna 200', () => pm.response.to.have.status(200));",
+            "const body = pm.response.json(); pm.test('ID e nome foram preservados', function () { pm.expect(String(body.id)).to.eql(String(pm.collectionVariables.get('fisicaTesteId'))); pm.expect(body.nome).to.eql('Colaborador Atualizado'); });"
+          ] } }]
+        },
+        {
+          "name": "Buscar colaborador por ID",
+          "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/api/pessoas/{{fisicaTesteId}}" },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('Consulta retorna 200', () => pm.response.to.have.status(200));",
+            "pm.test('Tipo é FISICA', () => pm.expect(pm.response.json().tipo).to.eql('FISICA'));"
+          ] } }]
+        }
+      ]
+    },
+    {
+      "name": "03 - Pessoas jurídicas",
+      "item": [
+        {
+          "name": "Cadastrar pessoa jurídica",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"telefone\":\"1133334444\",\"cep\":\"01001000\",\"logradouro\":\"Praça da Sé\",\"numero\":\"200\",\"bairro\":\"Sé\",\"cidade\":\"São Paulo\",\"estado\":\"SP\",\"razaoSocial\":\"Instituto Postman\",\"cnpj\":\"{{cnpjTeste}}\"}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{baseUrl}}/api/pessoas/juridicas"
+          },
+          "event": [
+            { "listen": "prerequest", "script": { "type": "text/javascript", "exec": ["pm.collectionVariables.set('cnpjTeste', '11222333000181');"] } },
+            { "listen": "test", "script": { "type": "text/javascript", "exec": [
+              "pm.test('Pessoa jurídica criada com 201', () => pm.response.to.have.status(201));",
+              "const body = pm.response.json(); pm.collectionVariables.set('juridicaId', body.id);",
+              "pm.test('Resposta representa pessoa jurídica ativa', function () { pm.expect(body.tipo).to.eql('JURIDICA'); pm.expect(body.status).to.eql(true); pm.expect(body.cnpj).to.eql(pm.collectionVariables.get('cnpjTeste')); });"
+            ] } }
+          ]
+        },
+        {
+          "name": "Rejeitar CNPJ duplicado",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\"telefone\":\"1133334444\",\"cep\":\"01001000\",\"logradouro\":\"Praça da Sé\",\"numero\":\"201\",\"bairro\":\"Sé\",\"cidade\":\"São Paulo\",\"estado\":\"SP\",\"razaoSocial\":\"CNPJ Duplicado\",\"cnpj\":\"{{cnpjTeste}}\"}", "options": { "raw": { "language": "json" } } },
+            "url": "{{baseUrl}}/api/pessoas/juridicas"
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('CNPJ duplicado retorna 409', () => pm.response.to.have.status(409));"] } }]
+        },
+        {
+          "name": "Rejeitar pessoa jurídica inválida",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\"telefone\":\"1133334444\",\"cep\":\"\",\"logradouro\":\"Praça da Sé\",\"numero\":\"201\",\"bairro\":\"Sé\",\"cidade\":\"São Paulo\",\"estado\":\"SP\",\"razaoSocial\":\"Registro Inválido\",\"cnpj\":\"00000000000000\"}", "options": { "raw": { "language": "json" } } },
+            "url": "{{baseUrl}}/api/pessoas/juridicas"
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('Campo obrigatório inválido retorna 400', () => pm.response.to.have.status(400));",
+            "pm.test('Mensagem identifica CEP', () => pm.expect(pm.response.json().message).to.include('cep'));"
+          ] } }]
+        },
+        {
+          "name": "Atualizar pessoa jurídica",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\"telefone\":\"1155556666\",\"cep\":\"01001000\",\"logradouro\":\"Praça da Sé\",\"numero\":\"250\",\"bairro\":\"Sé\",\"cidade\":\"São Paulo\",\"estado\":\"SP\",\"razaoSocial\":\"Instituto Postman Atualizado\",\"cnpj\":\"{{cnpjTeste}}\"}", "options": { "raw": { "language": "json" } } },
+            "url": "{{baseUrl}}/api/pessoas/juridicas/{{juridicaId}}"
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('Atualização retorna 200', () => pm.response.to.have.status(200));",
+            "pm.test('Razão social atualizada', () => pm.expect(pm.response.json().razaoSocial).to.eql('Instituto Postman Atualizado'));"
+          ] } }]
+        },
+        {
+          "name": "Buscar pessoa jurídica por ID",
+          "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/api/pessoas/{{juridicaId}}" },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('Consulta retorna 200', () => pm.response.to.have.status(200));",
+            "pm.test('Tipo é JURIDICA', () => pm.expect(pm.response.json().tipo).to.eql('JURIDICA'));"
+          ] } }]
+        }
+      ]
+    },
+    {
+      "name": "04 - Consultas e autorização",
+      "item": [
+        {
+          "name": "Listar pessoas ativas",
+          "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/api/pessoas?status=true" },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('Listagem retorna 200', () => pm.response.to.have.status(200));",
+            "pm.test('Resposta é lista de pessoas ativas', function () { const body = pm.response.json(); pm.expect(body).to.be.an('array'); body.forEach(p => pm.expect(p.status).to.eql(true)); });"
+          ] } }]
+        },
+        {
+          "name": "Buscar pessoa inexistente",
+          "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/api/pessoas/999999999" },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('Pessoa inexistente retorna 404', () => pm.response.to.have.status(404));",
+            "pm.test('Erro segue contrato padrão', () => pm.expect(pm.response.json().status).to.eql(404));"
+          ] } }]
+        },
+        {
+          "name": "Login do colaborador",
+          "auth": { "type": "noauth" },
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\"usuario\":\"{{usuarioTeste}}\",\"senha\":\"{{senhaTeste}}\"}", "options": { "raw": { "language": "json" } } },
+            "url": "{{baseUrl}}/api/auth/login"
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('Login do colaborador retorna 200', () => pm.response.to.have.status(200));",
+            "pm.collectionVariables.set('colaboradorToken', pm.response.json().token);"
+          ] } }]
+        },
+        {
+          "name": "Colaborador pode consultar pessoas",
+          "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{colaboradorToken}}", "type": "string" }] },
+          "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/api/pessoas" },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Consulta do colaborador retorna 200', () => pm.response.to.have.status(200));"] } }]
+        },
+        {
+          "name": "Colaborador não pode alterar acesso",
+          "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{colaboradorToken}}", "type": "string" }] },
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\"telefone\":\"11977776666\",\"cep\":\"01310100\",\"logradouro\":\"Avenida Paulista\",\"numero\":\"1100\",\"bairro\":\"Bela Vista\",\"cidade\":\"São Paulo\",\"estado\":\"SP\",\"nome\":\"Tentativa sem permissão\",\"cpf\":\"{{cpfTeste}}\",\"dataNascimento\":\"1995-05-20\",\"email\":\"{{emailTeste}}\",\"usuario\":\"{{usuarioTeste}}\",\"senha\":null,\"perfil\":\"ADMINISTRADOR\"}", "options": { "raw": { "language": "json" } } },
+            "url": "{{baseUrl}}/api/pessoas/fisicas/{{fisicaTesteId}}"
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Alteração pelo colaborador retorna 403', () => pm.response.to.have.status(403));"] } }]
+        }
+      ]
+    },
+    {
+      "name": "05 - Famílias",
+      "item": [
+        {
+          "name": "Cadastrar integrante sem acesso",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\"telefone\":\"11966665555\",\"cep\":\"01310100\",\"logradouro\":\"Avenida Paulista\",\"numero\":\"1000\",\"bairro\":\"Bela Vista\",\"cidade\":\"São Paulo\",\"estado\":\"SP\",\"nome\":\"Integrante Postman\",\"cpf\":\"11144477735\",\"dataNascimento\":\"2000-01-10\",\"email\":null,\"nomeMae\":\"Maria Teste\",\"sexo\":\"FEMININO\",\"estadoCivil\":\"SOLTEIRO_A\",\"rg\":\"1234567\",\"nis\":\"12345678901\",\"escolaridade\":\"ENSINO_MEDIO\",\"ocupacao\":\"Estudante\",\"contato2\":null,\"usuario\":null,\"senha\":null,\"perfil\":null}", "options": { "raw": { "language": "json" } } },
+            "url": "{{baseUrl}}/api/pessoas/fisicas"
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Integrante criado sem acesso', () => pm.response.to.have.status(201));", "const body=pm.response.json(); pm.collectionVariables.set('membroId', body.id); pm.expect(body.usuario).to.eql(null);"] } }]
+        },
+        {
+          "name": "Cadastrar família",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\"nome\":\"Família Souza\",\"rendas\":[{\"tipo\":\"TRABALHO\",\"ativa\":true,\"valor\":1200.00},{\"tipo\":\"BOLSA_FAMILIA\",\"ativa\":true,\"valor\":600.00}],\"integrantes\":[{\"pessoaId\":{{fisicaTesteId}},\"vinculo\":\"MAE\"},{\"pessoaId\":{{membroId}},\"vinculo\":\"FILHO_A\"}],\"relatos\":\"Família cadastrada pelo Postman\",\"avaliacao\":\"APROVADA\"}", "options": { "raw": { "language": "json" } } },
+            "url": "{{baseUrl}}/api/familias"
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Família criada', () => pm.response.to.have.status(201));", "const body=pm.response.json(); pm.collectionVariables.set('familiaId', body.id); pm.expect(body.quantidadeIntegrantes).to.eql(2);"] } }]
+        },
+        {
+          "name": "Listar e buscar famílias",
+          "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/api/familias?busca=Souza&status=true" },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Busca retorna família ativa', () => pm.response.to.have.status(200));", "pm.expect(pm.response.json()).to.be.an('array').that.is.not.empty;"] } }]
+        },
+        {
+          "name": "Visualizar família",
+          "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/api/familias/{{familiaId}}" },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Ficha completa retorna 200', () => pm.response.to.have.status(200));", "pm.expect(pm.response.json()).to.have.property('integrantes');"] } }]
+        },
+        {
+          "name": "Inativar família",
+          "request": { "method": "PATCH", "header": [], "url": "{{baseUrl}}/api/familias/{{familiaId}}/inativar" },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Inativação retorna 204', () => pm.response.to.have.status(204));"] } }]
+        },
+        {
+          "name": "Reativar família",
+          "request": { "method": "PATCH", "header": [], "url": "{{baseUrl}}/api/familias/{{familiaId}}/reativar" },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Reativação retorna 204', () => pm.response.to.have.status(204));"] } }]
+        }
+      ]
+    },
+    {
+      "name": "06 - Atendimento da idosa",
+      "item": [
+        {
+          "name": "Cadastrar atendimento e questionário",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\"fisicaId\":{{fisicaTesteId}},\"dataAtendimento\":\"2026-09-21\",\"bolsaFamilia\":true,\"crasNochete\":true,\"ubsEsfGuanabara\":false,\"questionario\":[{\"numero\":1,\"resposta\":\"SIM\",\"observacao\":\"Observação 1\"},{\"numero\":2,\"resposta\":\"NAO\"},{\"numero\":3,\"resposta\":\"NAO\"},{\"numero\":4,\"resposta\":\"SIM\"},{\"numero\":5,\"resposta\":\"SIM\"},{\"numero\":6,\"resposta\":\"NAO\"},{\"numero\":7,\"resposta\":\"NAO\"},{\"numero\":8,\"resposta\":\"SIM\"},{\"numero\":9,\"resposta\":\"NAO\"},{\"numero\":10,\"resposta\":\"SIM\"},{\"numero\":11,\"resposta\":\"SIM\",\"observacao\":\"Medicação contínua\"},{\"numero\":12,\"resposta\":\"NAO\"}],\"encaminhamentos\":\"CRAS\",\"relatos\":\"Primeiro atendimento\"}", "options": { "raw": { "language": "json" } } },
+            "url": "{{baseUrl}}/api/atendimentos"
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Atendimento criado', () => pm.response.to.have.status(201));", "const body=pm.response.json(); pm.collectionVariables.set('atendimentoId', body.id); pm.expect(body.questionario).to.have.length(12);"] } }]
+        },
+        {
+          "name": "Consultar atendimentos da pessoa",
+          "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/api/atendimentos?fisicaId={{fisicaTesteId}}" },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Consulta retorna 200', () => pm.response.to.have.status(200));", "pm.expect(pm.response.json()).to.be.an('array').that.is.not.empty;"] } }]
+        }
+      ]
+    },
+    {
+      "name": "07 - Inativação",
+      "item": [
+        {
+          "name": "Inativar família antes do responsável",
+          "request": { "method": "PATCH", "header": [], "url": "{{baseUrl}}/api/familias/{{familiaId}}/inativar" },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Família inativada com 204', () => pm.response.to.have.status(204));"] } }]
+        },
+        {
+          "name": "Inativar colaborador",
+          "request": { "method": "DELETE", "header": [], "url": "{{baseUrl}}/api/pessoas/{{fisicaTesteId}}" },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Inativação retorna 204', () => pm.response.to.have.status(204));"] } }]
+        },
+        {
+          "name": "Consultar pessoa física inativada",
+          "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/api/pessoas/{{fisicaTesteId}}" },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Consulta após inativação retorna 200', () => pm.response.to.have.status(200));", "pm.expect(pm.response.json().status).to.eql(false);"] } }]
+        },
+        {
+          "name": "Usuário inativado não autentica",
+          "auth": { "type": "noauth" },
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\"usuario\":\"{{usuarioTeste}}\",\"senha\":\"{{senhaTeste}}\"}", "options": { "raw": { "language": "json" } } },
+            "url": "{{baseUrl}}/api/auth/login"
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Login após inativação retorna 401', () => pm.response.to.have.status(401));"] } }]
+        },
+        {
+          "name": "Inativar pessoa jurídica",
+          "request": { "method": "DELETE", "header": [], "url": "{{baseUrl}}/api/pessoas/{{juridicaId}}" },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Inativação retorna 204', () => pm.response.to.have.status(204));"] } }]
+        },
+        {
+          "name": "Consultar pessoa jurídica inativada",
+          "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/api/pessoas/{{juridicaId}}" },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Consulta após inativação retorna 200', () => pm.response.to.have.status(200));", "pm.expect(pm.response.json().status).to.eql(false);"] } }]
+        },
+        {
+          "name": "Listar pessoas inativas",
+          "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/api/pessoas?status=false" },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Listagem de inativos retorna 200', () => pm.response.to.have.status(200));", "pm.response.json().forEach(p => pm.expect(p.status).to.eql(false));"] } }]
+        },
+        {
+          "name": "Reativar pessoa física",
+          "request": { "method": "PATCH", "header": [], "url": "{{baseUrl}}/api/pessoas/{{fisicaTesteId}}/reativar" },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Reativação retorna 204', () => pm.response.to.have.status(204));"] } }]
+        },
+        {
+          "name": "Reativar pessoa jurídica",
+          "request": { "method": "PATCH", "header": [], "url": "{{baseUrl}}/api/pessoas/{{juridicaId}}/reativar" },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Reativação retorna 204', () => pm.response.to.have.status(204));"] } }]
+        }
+      ]
+    }
+  ]
+}
